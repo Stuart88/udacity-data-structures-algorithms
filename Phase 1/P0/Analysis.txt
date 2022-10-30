@@ -1,0 +1,75 @@
+
+##################################################################
+
+## Task 0
+
+Big-O: 6
+
+Steps:
+1. Get first item of texts array
+2. Print line
+3. Calculate len(calls)
+4. Calculate len(calls) - 1
+5. Get last item of calls array
+6. Print line
+
+##################################################################
+
+## Task 1
+
+Big-O: 2n
+
+The procedure performs 2 checks for each entry of the csv files.
+
+##################################################################
+
+## Task 2
+
+Big-O: 5n
+
+n times steps:
+ 1. Check key c[0] exists in dict
+ 2. Append/Update dict
+ 3. Check key c[1] exists in dict
+ 4. Append/Update dict
+
+Plus n times looping through final dict to find highest value
+
+##################################################################
+
+## Task 3
+
+Big-O: 10n + nlogn
+
+n times steps:
+	1. Check isBangaloreNumber(caller)
+	2. Run getAreaCodeOrPrefix() -> Run getMobilePrefix()
+	3. Max characters in mobile prefix is 5
+	4.  - loop mobile char
+	5.  - loop mobile char
+	6.  - loop mobile char
+	7.  - loop mobile char
+	8. Check isBangaloreNumber(receiver)
+	9. Append calledNums 
+
+Then Sort calledNums. (nlogn)
+Then loop over calledNums for print(). (+ n)
+
+
+##################################################################
+
+## Task 4
+
+Big-O: n^2 + nlogn
+
+Procedure steps:
+for c in calls:
+	for t in texts:
+	...
+	for subC in calls:
+	...
+
+So there is one nested loop, leading to n^2 complexity.
+Additionally, there is the sorting function which adds nlogn.
+
+##################################################################
