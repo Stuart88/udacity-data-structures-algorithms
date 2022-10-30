@@ -15,7 +15,7 @@ test_dir_path = f'{dir_path}\\testdir';
 
 def find_files(suffix, path):
 
-    if suffix is None:
+    if suffix is None or path is None:
         return []
 
     # Check path exists
@@ -71,16 +71,32 @@ files = find_files('.h', test_dir_path)
 test_for_suffix('Test 2', '.h')
 print_result(files)
 
+# Test null suffix
 files = find_files(None, 123)
 test_for_suffix('Test 3', 123)
 print_result(files)
 
-files = find_files(None, None)
+# Test null path
+files = find_files('.c', None)
 test_for_suffix('Test 4', None)
 print_result(files)
 
+# Test file type without any existing data
 files = find_files('.exe', test_dir_path)
 test_for_suffix('Test 5', '.exe')
+print_result(files)
+
+
+# Test empty string suffix
+# Question: This results in getting all files. 
+# It needs to be determined whether this is expected or an exception
+files = find_files('', test_dir_path)
+test_for_suffix('Test 6', '')
+print_result(files)
+
+# Test empty string path
+files = find_files('.c', '')
+test_for_suffix('Test 7', '')
 print_result(files)
 
 
