@@ -1,96 +1,164 @@
+
 """
-We have briefly discussed caching as part of a practice problem while studying hash maps.
+For this problem we use a doubly linked list for maintaining a 'queue' of keys,
+such that the oldest key is always at the head of the list. 
 
-The lookup operation (i.e., get()) and put() / set() is supposed to be fast for a cache memory.
+Cache items are stored in a dictionary, and are accessed by any given key.
+Complexity: O(1)
 
-While doing the get() operation, if the entry is found in the cache, it is known as a cache hit. If, however, the entry is not found, it is known as a cache miss.
+If the key does not exist, it is prepended to the tail of the linked list, such that
+it is the 'youngest' key in the cache
+Complexity: Worst case O(n) to check key exists, best case O(1)
 
-When designing a cache, we also place an upper bound on the size of the cache. If the cache is full and we want to add a new entry to the cache, we use some criteria to remove an element. After removing an element, we use the put() operation to insert the new element. The remove operation should also be fast.
+If the key already exists, it will be removed from the cache and prepended back onto 
+the tail of the list, thus making it 'youngest' again
+Complexity: Worst case O(n) as need to cycle through entries in removal process. Best case O(1)
 
-For our first problem, the goal will be to design a data structure known as a Least Recently Used (LRU) cache. An LRU cache is a type of cache in which we remove the least recently used entry when the cache memory reaches its limit. For the current problem, consider both get and set operations as an use operation.
+If the cache is full, the oldest key is removed by getting the head of linked list
+Complexity: Worst case O(n) to check and then remove key. Best case O(1)
 
-Your job is to use an appropriate data structure(s) to implement the cache.
-
-In case of a cache hit, your get() operation should return the appropriate value.
-In case of a cache miss, your get() should return -1.
-While putting an element in the cache, your put() / set() operation must insert the element. If the cache is full, you must write code that removes the least recently used entry first and then insert the element.
-All operations must take O(1) time.
-
-For the current problem, you can consider the size of cache = 5.
-
-Here is some boiler plate code and some example test cases to get you started on this problem:
 """
+
 class DoubleNode:
     def __init__(self, value):
         self.value = value
         self.next = None
         self.previous = None
-        
+
 
 class DoublyLinkedList:
+
     def __init__(self):
-        self.items = []
+        self.head = None
+        self.tail = None
+        self.num_elements = 0
     
     def size(self):
-        return len(self.items)
-    
-    def enqueue(self, item):
-        self.items.append(item)
+        return self.num_elements
 
-    def dequeue(self):
-        if self.size() == 0:
+    def prepend(self, value):
+        
+        new_node = DoubleNode(value)
+
+        if self.head is None:
+            self.head = new_node
+            self.tail = new_node
+        elif self.tail is None:
+            new_node.previous = self.head
+            self.head.next = new_node
+            self.tail = new_node
+        else:
+            self.tail.next = new_node
+            new_node.previous = self.tail
+            self.tail = new_node
+
+        self.num_elements += 1
+    
+    def pop_head(self):
+        if self.head is None:
             return None
-        returnVal = self.items[0]
-        newArr = []
-        if self.size() > 1:
-            for i in range(1, self.size()):
-                newArr.append(self.items[i])
-        self.items = newArr
-        return returnVal
+        else:
+            val = self.head.value
+            new_head = self.head.next
+            self.head = new_head
+            self.num_elements -= 1
+            return val
 
     def remove(self, value):
-        newArr = []
-        for i in self.items:
-            if i != value:
-                newArr.append(i)
-        self.items = newArr
+        
+        if self.size() == 0:
+            pass
+
+        new_self = DoublyLinkedList()
+
+        loop_Node = self.head
+
+        while loop_Node is not None:
+            if loop_Node.value != value:
+                new_self.prepend(loop_Node.value)
+            loop_Node = loop_Node.next
+        
+        self.head = new_self.head
+        self.tail = new_self.tail
+        self.num_elements -= 1
 
     def contains(self, value):
-        for i in self.items:
-            if i == value:
+        if self.num_elements == 0:
+            return False
+
+        check_Node = self.head
+        
+        while check_Node is not None:
+            if check_Node.value == value:
                 return True
+            check_Node = check_Node.next
+
         return False
+
+    def __str__(self) -> str:
+        str = ''
+        head_val = self.head
+        while head_val is not None:
+            str += f'{head_val.value}, '
+            head_val = head_val.next
+        return str
+
 
 
 class LRU_Cache(object):
 
     def __init__(self, capacity):
         self.capacity = capacity
-        self.cache_keys = Queue()
+        self.cache_keys = DoublyLinkedList()
         self.cache = {}
 
     def get(self, key):
         if key == None or not self.cache_keys.contains(key):
             return -1
-        val = self.cache[key]
-        if val is None:
-            return -1
         else:
+            # Get value
+            val = self.cache[key]
+            # Then move key to tail, i.e. make it the 'youngest key'
+            self.cache_keys.remove(key)     
+            self.cache_keys.prepend(key)   
             return val
 
     def set(self, key, value):
-        if not self.cache_keys.contains(key):
-            if len(self.cache) >= self.capacity: 
-                # Cache full
-                # Dequeue oldest key and delete from dict
-                oldest_key = self.cache_keys.dequeue()
-                del self.cache[oldest_key]
-
+        if self.cache_keys.contains(key):
+            # Cache already has value with key
+            # Replace cache item, then move key to tail (set as 'youngest')
             self.cache[key] = value
-            self.cache_keys.enqueue(key)
+            self.cache_keys.remove(key)
+            self.cache_keys.prepend(key)
         else:
-            self.cache_keys.remove(key) # Remove existing key
-            self.cache_keys.enqueue(key) # Add to head of queue
+            # New key item.
+            # First check if cache is full
+            if self.cache_keys.size() == self.capacity:
+                # Cache is full. Remove oldest key and corresponding cache value
+                oldest_key = self.cache_keys.pop_head()
+                del self.cache[oldest_key]
+                self.cache[key] = value
+                self.cache_keys.prepend(key)
+            else:
+                #Cache not full so just add new key
+                self.cache[key] = value
+                self.cache_keys.prepend(key)
+
+    def __str__(self) -> str:
+        return f'LRU Cache Details:\nCache Dictionary {self.cache}\nCache Keys: {self.cache_keys}'
+
+
+def test_case(test_name, val, expected, cache: LRU_Cache):
+    if len(cache.cache) > cache.capacity:
+        print(f'Cache too large: ({len(cache.cache)})')
+        pass
+    if cache.cache_keys.size() > cache.capacity:
+        print(f'Keys Cache too large: ({cache.cache_keys.size()})')
+        pass
+    if val == expected:
+        print(f'{test_name} Passed')
+    else:
+        print(f'{test_name} Failed')
 
 our_cache = LRU_Cache(5)
 
@@ -99,50 +167,47 @@ our_cache.set(2, 2);
 our_cache.set(3, 3);
 our_cache.set(4, 4);
 
-our_cache.get(1)       # returns 1
-our_cache.get(2)       # returns 2
-our_cache.get(9)       # returns -1 because 9 is not present in the cache
+our_cache.get(1)       # returns 1 and sets 1 as youngest key
+our_cache.get(2)       # returns 2 and sets 2 as youngest key
+our_cache.get(9)       
 
 our_cache.set(5, 5) 
 our_cache.set(6, 6)
 
-our_cache.get(3)      # returns -1 because the cache reached its capacity and 3 was the least recently used entry
+print('\nBEGIN TESTS')
 
-# Add your own test cases: include at least three test cases
-# and two of them must include edge cases, such as null, empty or very large values
-
-def test_case(test_name, val, expected):
-    if val == expected:
-        print(f'{test_name} Passed')
-    else:
-        print(f'{test_name} Failed')
-
-test_case('Test 0',  our_cache.get(3), -1)
+our_cache.get(3)      # Should return -1 because cache reached capacity; the '3' key was removed already
+test_case('Test 0',  our_cache.get(3), -1, our_cache)
 
 # Test get None
-test_case('Test 1',  our_cache.get(None), -1)
+test_case('Test 1',  our_cache.get(None), -1, our_cache)
 
 # Test get large value
-test_case('Test 2', our_cache.get(9999999999999999), -1)
+test_case('Test 2', our_cache.get(9999999999999999), -1, our_cache)
 
 # Test normal get
 our_cache.set(12, 87)
-test_case('Test 3', our_cache.get(12), 87)
+test_case('Test 3', our_cache.get(12), 87, our_cache)
 
-# Test use of existing key
+# Test re-use of existing key
 our_cache.set(12, 99)
-test_case('Test 4', our_cache.get(12), 99)
+test_case('Test 4', our_cache.get(12), 99, our_cache)
 
 # Test string key
 our_cache.set('err', 1)
-test_case('Test 5', our_cache.get('err'), 1)
+test_case('Test 5', our_cache.get('err'), 1, our_cache)
+
 
 # Test get value for key that is too old
-our_cache.set(10, 2)
-our_cache.set(11, 3)
-our_cache.set(12, 4)
-our_cache.set(13, 5)
-our_cache.set(14, 6)
-our_cache.set(15, 7)
-our_cache.set(16, 9)
-test_case('Test 6', our_cache.get(10), -1)
+
+our_cache.set(10, 2) # <-- This should be too old, so expect -1 result
+our_cache.set('a', 3)
+our_cache.set('cow', 5)
+our_cache.set(2, 6)
+our_cache.set(1, 7)
+our_cache.set('ape', 9)
+test_case('Test 6', our_cache.get(10), -1, our_cache)
+
+print('END TESTS\n')
+print('Testing Complete\n')
+print(our_cache)
