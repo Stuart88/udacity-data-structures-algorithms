@@ -20,27 +20,77 @@ For the current problem, you can consider the size of cache = 5.
 
 Here is some boiler plate code and some example test cases to get you started on this problem:
 """
+class DoubleNode:
+    def __init__(self, value):
+        self.value = value
+        self.next = None
+        self.previous = None
+        
+
+class DoublyLinkedList:
+    def __init__(self):
+        self.items = []
+    
+    def size(self):
+        return len(self.items)
+    
+    def enqueue(self, item):
+        self.items.append(item)
+
+    def dequeue(self):
+        if self.size() == 0:
+            return None
+        returnVal = self.items[0]
+        newArr = []
+        if self.size() > 1:
+            for i in range(1, self.size()):
+                newArr.append(self.items[i])
+        self.items = newArr
+        return returnVal
+
+    def remove(self, value):
+        newArr = []
+        for i in self.items:
+            if i != value:
+                newArr.append(i)
+        self.items = newArr
+
+    def contains(self, value):
+        for i in self.items:
+            if i == value:
+                return True
+        return False
 
 
 class LRU_Cache(object):
 
     def __init__(self, capacity):
         self.capacity = capacity
-        self.indexer = 0
-        self.oldest_key = None
-        pass
+        self.cache_keys = Queue()
+        self.cache = {}
 
     def get(self, key):
-        if key == None or key not in self.items:
+        if key == None or not self.cache_keys.contains(key):
             return -1
-        val = self.items[key]
+        val = self.cache[key]
         if val is None:
             return -1
         else:
             return val
 
     def set(self, key, value):
-        pass
+        if not self.cache_keys.contains(key):
+            if len(self.cache) >= self.capacity: 
+                # Cache full
+                # Dequeue oldest key and delete from dict
+                oldest_key = self.cache_keys.dequeue()
+                del self.cache[oldest_key]
+
+            self.cache[key] = value
+            self.cache_keys.enqueue(key)
+        else:
+            self.cache_keys.remove(key) # Remove existing key
+            self.cache_keys.enqueue(key) # Add to head of queue
 
 our_cache = LRU_Cache(5)
 
@@ -66,10 +116,6 @@ def test_case(test_name, val, expected):
         print(f'{test_name} Passed')
     else:
         print(f'{test_name} Failed')
-
-print(our_cache.size())
-print(our_cache.queue_size())
-print(our_cache)
 
 test_case('Test 0',  our_cache.get(3), -1)
 
