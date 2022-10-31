@@ -1,5 +1,17 @@
 import sys
 
+"""
+Implementation of Huffman encoding for lossless data compression.
+Uses binary tree structure and an 'EncodingData' class which holds information 
+about the frequency and encoding value for each character in the given message.
+
+Complexity: O(nlogn)
+
+Reason: All processes are O(n), apart from the get_character_data_codes() method
+which is O(nlogn), hence this represents the worst case scenario for large n 
+in a message where all characters are unique
+"""
+
 class HuffmanTreeNode:
     def __init__(self, char: str, freq: int) -> None:
         self.left: HuffmanTreeNode = None
@@ -9,19 +21,28 @@ class HuffmanTreeNode:
         self.frequency: int = freq
         self.bit_value: str = ''
         self.huffman_code: str = ''
+        self.scanned: bool = False
+    
+    def is_leaf_node(self):
+        return self.left is None and self.right is None 
+    
+    def __repr__(self) -> str:
+        return f'{self.char}:{self.frequency}'
 
 class EncodingData:
     def __init__(self, char: str, freq: int, code: str) -> None:
         self.char = char
         self.freq = freq
         self.code = code
-        pass
+    
+    def __repr__(self) -> str:
+        return f'{self.char}:{self.freq}:{self.code}'
 
 class EncodingsList:
     def __init__(self) -> None:
-        self.items = []
+        self.items: list[EncodingData] = []
     
-    def append(self, item):
+    def append(self, item: EncodingData):
         self.items.append(item)
     
     def contains_char(self, char: str):
@@ -31,10 +52,33 @@ class EncodingsList:
             if self.items[i].char == char:
                 return True
         return False
+    
+    def size(self):
+        return len(self.items)
 
-class PriorityQueue:
+    def add_code(self, key, code):
+        for i in self.items:
+            if i.char == key:
+                i.code = code
+                return
+        pass
+    
+    def encoded_items_count(self):
+        count = 0
+        for i in self.items:
+            if i.code != '' and i.code != None:
+                count += 1
+        return count
+
+    def get_code_for_character(self, char):
+        for i in self.items:
+            if i.char == char:
+                return i.code
+        return ''
+
+class HuffmanPriorityQueue:
     def __init__(self) -> None:
-        self.items = []
+        self.items: list[HuffmanTreeNode] = []
         self.num_elements = 0
 
     def append(self, node: HuffmanTreeNode):
@@ -42,7 +86,8 @@ class PriorityQueue:
         self.num_elements += 1
 
     def sort(self) -> None:
-        self.items.sort(key=lambda x: x.frequency)
+        """Sorts items by frequency of characters, highest to lowest"""
+        self.items.sort(key=lambda x: x.frequency, reverse=True)
 
     def size(self):
         return self.num_elements
@@ -60,13 +105,17 @@ class PriorityQueue:
 class HuffmanTree:
     def __init__(self, message: str) -> None:
         self.message: str = message
-        self.character_freqs: dict = self.determine_character_frequencies(self.message)
-        self.nodes_list: PriorityQueue = self.generate_tree_nodes(self.character_freqs)
+        self.character_data: EncodingsList = self.determine_character_frequencies(self.message)
+        self.nodes_list: HuffmanPriorityQueue = self.generate_tree_nodes(self.character_data)
         self.root: HuffmanTreeNode = self.convert_nodes_to_huffman_tree(self.nodes_list)
-        self.current_encodings: EncodingsList = EncodingsList()
 
-    def determine_character_frequencies(self, message: str) -> dict:
-        
+    def determine_character_frequencies(self, message: str) -> EncodingsList:
+        """
+        Finds the frequency of each character occurrence in the given message,
+        and stores results in EncodingsList object for future use
+        Complexity: O(n) 
+        Worst case O(2n) if frequencies_dict is all unique values
+        """
         frequencies_dict = {}
         
         for c in message:
@@ -76,38 +125,47 @@ class HuffmanTree:
                 frequencies_dict[c] = val
             else:
                 frequencies_dict[c] = 1
-        
-        dict(sorted(frequencies_dict.items(), key=lambda item: item[1]))
 
-        return frequencies_dict
+        encodings_data = EncodingsList()
+
+        for v in frequencies_dict:
+            encodings_data.append(EncodingData(v, frequencies_dict[v], ''))
+
+
+        return encodings_data
     
     
-    def generate_tree_nodes(self, dict: dict) -> PriorityQueue:
+    def generate_tree_nodes(self, encoding_items: EncodingsList) -> HuffmanPriorityQueue:
         """ 
         Converts a dictionary of { key = char, val = freq }
         into a list of HuffmanTreeNode objects.
-        
+        Complexity: O(n)
         """
-        node_list = PriorityQueue()
+        node_list = HuffmanPriorityQueue()
 
-        for i in dict:
-            new_node = HuffmanTreeNode(i, dict[i])
+        for i in encoding_items.items:
+            new_node = HuffmanTreeNode(i.char, i.freq)
             node_list.append(new_node)
 
         node_list.sort()
 
         return node_list
 
-    def convert_nodes_to_huffman_tree(self, nodes: PriorityQueue) -> HuffmanTreeNode:
-        processed_queue = self.recursively_generate_huffman_nodes(nodes)        
+    def convert_nodes_to_huffman_tree(self, nodes: HuffmanPriorityQueue) -> HuffmanTreeNode:
+        """
+        Converts Huffman priority queue of character freqyency data into binary tree root
+        via recursive generation.
+        """
+        processed_queue = self.generate_huffman_nodes(nodes)        
         return processed_queue.items[0]
         
 
-    def recursively_generate_huffman_nodes(self, nodes: PriorityQueue) -> PriorityQueue:
+    def generate_huffman_nodes(self, nodes: HuffmanPriorityQueue) -> HuffmanPriorityQueue:
         """
-        Recursively processes priority queue items into Hoffman Tree, i.e.
-        a PriorityQueue with a single remaining Hoffman Tree node entry that contains all other nodes
-        as children in a Hoffman Tree arrangement.
+        Recursively processes priority queue items into Huffman Tree, i.e.
+        a PriorityQueue with a single remaining Huffman Tree node entry that contains all other nodes
+        as children in a binary tree arrangement.
+        Complexity: O(n)
 
         """
         if nodes.size() == 1:
@@ -129,100 +187,153 @@ class HuffmanTree:
         nodes.append(new_node)
         nodes.sort()
         
-        return self.recursively_generate_huffman_nodes(nodes)
+        return self.generate_huffman_nodes(nodes)
 
-    def get_min_node(self, node: HuffmanTreeNode, current_encodings: EncodingsList) -> HuffmanTreeNode:
-        current_node = node
-        while current_node.left is not None or current_node.right is not None:
-            if current_node.left is not None and current_encodings.contains_char(current_node.left.char) == False:
-                current_node = self.get_min_node(current_node.left, current_encodings)
-            elif current_node.right is not None and current_encodings.contains_char(current_node.right.char) == False:
-                current_node = self.get_min_node(current_node.right, current_encodings)
+    def get_character_data_codes(self):
+        """
+        Traverses Huffman tree to find binary code value
+        of each character in character_data.
+        Complexity: O(nlogn)
+        Reason: The traversal runs the whole tree n times, but on
+        each traversal only goes as far as the latest unscanned node. Each scan 
+        decrements the distance needing to be traversed, hence it is O(nlogn), as opposed
+        to n^2 if the whole tree is traversed on each run
+        """
 
-        return current_node
+        current_node:HuffmanTreeNode = self.root
+        node_code:str = ''
+
+        while self.character_data.encoded_items_count() != self.character_data.size():
+
+            if current_node.left is not None and current_node.left.scanned == False:
+                # Traverse left
+                current_node = current_node.left
+                node_code += current_node.bit_value
+
+            elif current_node.right is not None and current_node.right.scanned == False:
+                # Traverse right
+                current_node = current_node.right
+                node_code += current_node.bit_value
+
+            else:
+                # Left and right already traversed.
+                # Mark current_node as scanned and move back to parent
+                current_node.scanned = True
+                current_node = current_node.parent
+                node_code = node_code[0:-1] # Remove the bit value that was added on
+
+            if current_node.char is not None:
+                self.character_data.add_code(current_node.char, node_code)
+                current_node.scanned = True
+                current_node = self.root
+                node_code = ''
+        
     
     def generate_huffman_code(self) -> str:
-
-        current_node:HuffmanTreeNode = self.get_min_node(self.root, self.current_encodings)
-
-        while current_node.parent is not None:
-            node_code = ''
-            loop_node = current_node
-            while loop_node is not None:
-                node_code += loop_node.bit_value
-                loop_node = loop_node.parent
-            self.current_encodings.append(EncodingData(current_node.char, current_node.frequency, node_code))
-            current_node = current_node.parent
-            
+        """
+        Creates final encoding of the given data.
+        Traverses Huffman tree nodes and appends binary code value to string result.
+        Complexity: O(n)
+        """
+        
+        self.get_character_data_codes()
+        
 
         final_code = ''
 
         for c in self.message:
-            for i in self.current_encodings.items:
-                if c == i.char:
-                    final_code += c
+            final_code += self.character_data.get_code_for_character(c)
         
         return final_code
+
+    def decode_data(self, data: str):
+        """
+        Iterates over the given encoded data and converts each item
+        into relevant character values from the leaves of the Huffman Tree
+        Complexity: O(n)
+        """
+        decoded_data = ''
+        current_node = self.root
+        for i in data:
+            if i == '0':
+                current_node = current_node.left
+                if current_node.is_leaf_node():
+                    decoded_data += current_node.char
+                    current_node = self.root
+            if i == '1':
+                current_node = current_node.right
+                if current_node.is_leaf_node():
+                    decoded_data += current_node.char
+                    current_node = self.root
+        
+        return decoded_data
             
-        
-        
-
-
-    
-
-
-           
-        
-
 
 def huffman_encoding(data):
     tree = HuffmanTree(data)
     return tree.generate_huffman_code(), tree
 
-def huffman_decoding(data,tree: HuffmanTree):
-    decoded_data = ''
-    current_node = tree.root
-    for i in data:
-        if i == '0':
-            if current_node.left is None:
-                decoded_data += current_node.char
-                current_node = tree.root
-            else:
-                current_node = current_node.left
-        if i == '1':
-            if current_node.right is None:
-                decoded_data += current_node.char
-                current_node = tree.root
-            else:
-                current_node = current_node.right
+def huffman_decoding(data, tree: HuffmanTree):
+    return tree.decode_data(data)
+    
 
-    return decoded_data
+def handle_data(data, print_data_sizes: bool):
 
+    if data is None:
+        return None
 
-if __name__ == "__main__":
-    codes = {}
+    if isinstance(data, str) == False:
+        return None
 
-    a_great_sentence = "The bird is the word"
-    a_great_sentence = 'AAAAAAABBBCCCCCCCDDEEEEEE'
+    if len(data) == 0:
+        return None
 
-    print ("The size of the data is: {}\n".format(sys.getsizeof(a_great_sentence)))
-    print ("The content of the data is: {}\n".format(a_great_sentence))
+    if print_data_sizes:
+        print ("The size of the data is: {}\n".format(sys.getsizeof(data)))
+        #print ("The content of the data is: {}\n".format(data))
 
-    encoded_data, tree = huffman_encoding(a_great_sentence)
+    encoded_data, tree = huffman_encoding(data)
 
-    print ("The size of the encoded data is: {}\n".format(sys.getsizeof(encoded_data)))
-    print ("The content of the encoded data is: {}\n".format(encoded_data))
+    if print_data_sizes:
+        print ("The size of the encoded data is: {}\n".format(sys.getsizeof(int(encoded_data, base=2))))
+        #print ("The content of the encoded data is: {}\n".format(encoded_data))
 
     decoded_data = huffman_decoding(encoded_data, tree)
 
-    print ("The size of the decoded data is: {}\n".format(sys.getsizeof(decoded_data)))
-    print ("The content of the encoded data is: {}\n".format(decoded_data))
+    if print_data_sizes:
+        print ("The size of the decoded data is: {}\n".format(sys.getsizeof(decoded_data)))
+        #print ("The content of the decoded data is: {}\n".format(decoded_data))
 
-# Add your own test cases: include at least three test cases
-# and two of them must include edge cases, such as null, empty or very large values
+    return decoded_data
 
-# Test Case 1
+def test_case(test_name, message, expected_result, print_data_sizes):
+    res = handle_data(message, print_data_sizes)
+    if res == expected_result:
+        print(f'{test_name} Passed')
+    else:
+        print(f'{test_name} Failed')
 
-# Test Case 2
+super_long_str = """This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long string This is a super long string This is a3432 super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long str32432ing This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long string This is 43a543 sfdper long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long strinwerewg This is a super longfdgg435543 string This ewr string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long string This is a super long4ong string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long strisdfdng This is a super 45ring This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string Terhis is a super long string This is a sugdsfper long string Thfgis is a23432 supeglong string This is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super longdfetrestring This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This iwsre a super long string This is a supe3243r long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long strThis is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is a super long3432 string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This is werewa super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringing This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string
+This is a super long string This 432is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long stringThis is a super long string This is a super long string This is a super long string This is a super long string"""
 
-# Test Case 3
+normal_string = "The bird is the word"
+
+print_data_sizes = True
+
+test_case('Test 1', super_long_str, super_long_str, print_data_sizes)
+test_case('Test 2', None, None, print_data_sizes)
+test_case('Test 3', 12345, None, print_data_sizes)
+test_case('Test 4', normal_string, normal_string, print_data_sizes)
