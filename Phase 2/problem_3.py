@@ -108,6 +108,7 @@ class HuffmanTree:
         self.character_data: EncodingsList = self.determine_character_frequencies(self.message)
         self.nodes_list: HuffmanPriorityQueue = self.generate_tree_nodes(self.character_data)
         self.root: HuffmanTreeNode = self.convert_nodes_to_huffman_tree(self.nodes_list)
+        self.nodes_list = None
 
     def determine_character_frequencies(self, message: str) -> EncodingsList:
         """

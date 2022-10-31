@@ -5,7 +5,6 @@ Recursively appends relevant file paths to array of strings.
 Complexity: O(n), where n is the number of existing directories and files
 '''
 
-from array import array
 from genericpath import isdir, isfile
 import os
 
