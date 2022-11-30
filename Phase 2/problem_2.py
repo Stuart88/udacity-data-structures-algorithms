@@ -9,7 +9,7 @@ from genericpath import isdir, isfile
 import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-test_dir_path = f'{dir_path}\\testdir';
+test_dir_path = f'{dir_path}\\testdir'
 
 
 def find_files(suffix, path):

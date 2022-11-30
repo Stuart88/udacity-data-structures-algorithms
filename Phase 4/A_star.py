@@ -1,16 +1,24 @@
 import networkx as nx
 import pickle
+import math
+from typing import List, Dict
 
+
+"""
+
+RUN THIS ONE TO VIEW THE RESULT
+
+"""
 
 class Map:
 	def __init__(self, G: nx.classes.graph.Graph):
 		if G is not None:
 			self._graph: nx.classes.graph.Graph = G
-			self.intersections: Dict[int, list[int]] = nx.get_node_attributes(G, "pos")
+			self.intersections: Dict[int, List[int]] = nx.get_node_attributes(G, "pos")
 			# self.roads is a list[list[int]] !
 			self.roads: list[list[int]] = [list(G[node]) for node in G.nodes()]
 		else:
-			self.intersections:Dict[int, list[int]] = {}
+			self.intersections:Dict[int, List[int]] = {}
 			self.roads: list[list[int]] = []
 
 	def save(self, filename):
@@ -23,190 +31,6 @@ def load_map(name):
 	return Map(G)
 
 ### Important stuff below...
-
-import sys
-import math
-from typing import List, Dict
-
-class PathNode:
-	def __init__(self, point: int, M: Map) -> None:
-		self.point = point
-		self.coords = Coordinate(M.intersections[point][0], M.intersections[point][1])
-		
-		self.parent: PathNode = None
-		self.child: PathNode = None
-		self.roads = M.roads[point]
-
-		self.dist_from_start = 0
-		
-		
-		self.g = 0 # path cost
-		self.h = 0 # estimated distance to goal. In this case use pythagorean distance between node and goal
-		self.f = 0 # g+h
-		# aim is to find optimal f 
-		
-	def __eq__(self, __o: object) -> bool:
-		if isinstance(__o, PathNode):
-			return self.point == __o.point
-		else:
-			return False
-
-	def __str__(self) -> str:
-		return str(self.point)
-
-	def __repr__(self) -> str:
-		return str(self.point)
-
-
-class Coordinate:
-	def __init__(self, x:int, y:int) -> None:
-		self.x = x
-		self.y = y
-
-def pythag_distance(a: Coordinate, b: Coordinate):
-	'''
-	Finds the pythagorean distance between two coordinates
-	Complexity:
-		Time: O(1)
-		Space: O(1)
-	'''
-	x_diff = math.pow(a.x - b.x, 2)
-	y_diff = math.pow(a.y - b.y, 2)
-	return math.sqrt(x_diff + y_diff)
-
-def create_heuristic_point_name(a_name: int, b_name: int):
-	'''
-	Creates a name for a heuristic measurement item representing
-	distance between points with unique numeric names
-	
-	For example: 
-		point 1 with point 7 will be named "1:7"
-		point 7 with point 1 will be named "1:7" also.
-
-	Complexity:
-		Time: O(1)
-		Space: O(1)
-	'''
-	if a_name < b_name:
-		return f'{a_name}:{b_name}'
-	else:
-		return f'{b_name}:{a_name}'
-
-
-
-def calculate_euclidian_distances(intersections: Dict[int, List[int]]):
-	"""
-	Creates a dictionary of pythagorean distances between each point
-	in the map
-
-	Complexity:
-		Time: O(n^2)
-		Space: O(nlogn) because reverse versions of the same distance are bypassed
-	"""
-	result: Dict[str, int] = {} 
-	for i in intersections:
-		for j in intersections:
-			
-			point_name = create_heuristic_point_name(i, j) 
-			
-			if point_name in result:
-				# Will hit this if it's an existing but reversed direction
-				# So we can skip it
-				pass 
-			else:
-				if i == j:
-					result[point_name] = 0
-				else:
-					a_coord = Coordinate(intersections[i][0], intersections[i][1])
-					b_coord = Coordinate(intersections[j][0], intersections[j][1])
-					result[point_name] = pythag_distance(a_coord, b_coord) 
-	return result
-
-def path_length(path_points: List[PathNode], euclid_distances:Dict[str, int]) -> int:
-	if len(path_points) <= 1:
-		return 0
-	distance = 0
-	for i in range(0, len(path_points) - 1):
-		dist_name = create_heuristic_point_name(path_points[i].point, path_points[i+1].point)
-		distance += euclid_distances[dist_name]
-	return distance
-
-def node_list_contains_point(node_list: List[PathNode], point: int):
-	for n in node_list:
-		if n.point == point:
-			return True
-	return False
-
-def greedy_shortest_path(current_path: List[PathNode], visited_points: List[PathNode], M: any, current_point:PathNode, goal: PathNode, euclid_distances: Dict[str, int]) -> None:
-	"""
-	Uses the 'greedy heuristic' approach to find the
-	next closest point to the goal along the available roads from the given current_point.
-	Returns the value of the next point
-	"""
-
-	
-	if current_point == goal:
-		return
-
-	visited_points.append(current_point)
-
-	
-	shortest_dist = sys.maxsize
-	next_point: int = None
-
-	current_path_length = path_length(current_path, euclid_distances)
-
-	for intersection in current_point.roads:
-		if node_list_contains_point(visited_points, intersection):
-			continue
-		dist_point_to_intersect = euclid_distances[create_heuristic_point_name(current_point.point, intersection)]
-		dist_intersect_to_goal = euclid_distances[create_heuristic_point_name(intersection, goal.point)]
-		total_dist = current_path_length + dist_point_to_intersect + dist_intersect_to_goal + current_point.dist_from_start
-		if total_dist < shortest_dist:
-			shortest_dist = total_dist
-			next_point = intersection
-
-
-	if next_point is not None:
-		next_point_node = PathNode(next_point, M)
-		current_point.child = next_point_node
-		next_point_node.parent = current_point
-		next_point_node.dist_from_start = current_point.dist_from_start + dist_point_to_intersect
-		current_path.append(next_point_node)
-		# print(current_path)
-		if next_point_node != goal:
-			greedy_shortest_path(current_path, visited_points, M, next_point_node, goal, euclid_distances)
-
-	return
-
-
-def shortest_path(M: any,start: int,goal: int):
-	
-	if start == None or goal == None:
-		return None
-
-	if isinstance(start, int) is False or isinstance(goal, int) is False:
-		return None
-
-	if start < 0 or goal < 0:
-		return None
-	
-	if start == goal:
-		return [goal]
-
-	print("shortest path called")
-	euc_distances = calculate_euclidian_distances(M.intersections)
-	current_point = PathNode(start, M)
-	goal_node = PathNode(goal, M)
-	visited_points: List[PathNode] = []
-	path: List[PathNode] = [current_point]
-	greedy_shortest_path(path, visited_points, M, current_point, goal_node, euc_distances)
-
-	result_path = []
-	for i in path:
-		result_path.append(i.point)
-
-	return result_path
 
 
 map_test = Map(None)
@@ -291,110 +115,246 @@ map_test.roads = [[36, 34, 31, 28, 17],
  [23, 29, 32],
  [2, 4, 7, 22, 28, 36]]
 
-# result = shortest_path(map_test, 8, 24)
-# expected = [8, 14, 16, 37, 12, 17, 10, 24]
-# print(result)
-# print(expected)
-# if result == expected:
-# 	print('YAY')
-# else:
-# 	print('NO')
 
-### NEW
+'''
+
+This is an implementation of the A* algorithm for path finding, using a given map
+with road and intersection information available to work with.
+
+For efficient and minimal path finding operation, the heuristic value 'h' for each point
+is calculated as the pythagorean distance between that point and the goal.
+
+NOTE:
+	Typical heuristic distances include:
+		
+		Manhattan distance: 
+			Best used on a grid where movements are limited to 4 directions up/down/left/right directions
+			The available paths are straight or 'L' shaped
+		
+		Diagonal distance:
+			Best used on a grid where movements are limited to 8 directions
+			up / down / left / right / up-left / up-right / down-left / down-right
+		
+		Euclidean distance:
+			The straight line distance between two points
+			Best applied where any direction can be followed
+			For the case of this assignment, the Euclidian distance has been chosen as a heuristic,
+			because the path between points can take any direction
 
 
-def generate_path_nodes(M: Map) -> List[PathNode]:
-	"""
-	Generates an array of path nodes with minimal data
-	(no parents, all values set to 0)
-	"""
-	result = []
-	for i in M.intersections:
-		result.append(PathNode(i, M))
-	return result
+During path traversal, the value 'g' is the current most efficient 
+distance from the start point to the point currently being looked at.
+
+Finally, each visited point is assigned a total value 'f' (= g + h) which represents the current
+best estimate for the a complete path that goes via that point.
+
+The aim is to efficiently find the path with the best 'f' value that starts at the start node
+and traverses the map to the end node, using the heuristic 'h' to guide the algorithm
+in the correct direction, so as to prevent the need to manually check every point 
+on the map.
+
+Complexity:
+
+	Complexity depends highly on the arrangement of the given map, i.e. number
+	of roads and intersections and how they are laid out.
+
+	Generally, some research tells me the following:
+	
+	Time: O(b^d) 
+		where b is the 'branching factor' - the average number of roads from each point,
+		and d is the depth of the resulting path.
+	
+	Space: O(d)  - The algorithm only stores useful path node data
+
+	Worst case：
+		Time: O(n^n) for map with all nodes interconnected
+		Space: O(n) as all nodes will be stored in the 'visited' set of nodes
+
+
+'''
+
+class Coordinate:
+	def __init__(self, x:int, y:int) -> None:
+		'''
+		inits a co-ordinate object representing the (x,y) position
+		of a map intersection
+		Complexity:
+			Time: O(1)
+			Space: O(1)
+		'''
+		self.x = x
+		self.y = y
+
+def euclidian_distance(a: Coordinate, b: Coordinate) -> float:
+	'''
+	Finds the pythagorean distance between two coordinates
+	Complexity:
+		Time: O(1)
+		Space: O(1)
+	'''
+	x_diff = math.pow(a.x - b.x, 2)
+	y_diff = math.pow(a.y - b.y, 2)
+	return math.sqrt(x_diff + y_diff)
+
+def manhattan_distance(a: Coordinate, b: Coordinate) -> float:
+	'''
+	Finds the manhattan distance between two coordinates
+	Complexity:
+		Time: O(1)
+		Space: O(1)
+	'''
+	x_diff = abs(a.x - b.x)
+	y_diff = abs(a.y - b.y)
+	return x_diff + y_diff
+
+def diagonal_distance(a: Coordinate, b: Coordinate) -> float:
+	'''
+	Finds the diagonal distance between two coordinates
+	Complexity:
+		Time: O(1)
+		Space: O(1)
+	'''
+	x_diff = abs(a.x - b.x)
+	y_diff = abs(a.y - b.y)
+	if x_diff > y_diff:
+		return math.sqrt(2 * y_diff ** 2) + (x_diff - y_diff)
+		# path moves straight left/right first, then diagonal to end point above or below
+	elif x_diff < y_diff:
+		# path moves straight up/down first, then diagonal to end point to left or right
+		return math.sqrt(2 * x_diff ** 2) + (y_diff - x_diff)
+	else:
+		# 'perfect' diagonal
+		return math.sqrt(2 * x_diff ** 2) # could also use y_diff here
+
+class PathNode:
+	def __init__(self, point: int, M: any) -> None:
+		'''
+		inits PathNode object with information about the node index (this is the intersection 'name'),
+		the node co-ordinates, and point index values (the 'names') for the roads connected to this node. 
+		The g, h and f path cost values are initialised as 0. These are calculated in-situ during 
+		the shortest_path process
+		Complexity:
+			Time: O(1)
+			Space: O(av(n)) the average number of roads across all map points
+		'''
+		self.point = point
+		self.coords = Coordinate(M.intersections[point][0], M.intersections[point][1])
+		
+		self.parent: PathNode = None
+		self.child: PathNode = None
+		self.roads: List[int] = M.roads[point]
+		
+		self.g = 0 # path cost from start to here, should increment based on sum of path cost of parent nodes
+		self.h = 0 # estimated distance to goal. In this case use pythagorean distance between node and goal
+		self.f = 0 # g+h , current estimated path cost from start to goal, via this node
+
+
+	def calculate_g_h_f(self, goal_coord: Coordinate) -> None:
+		'''
+		Determins the values of g, h and f of this node, based on data from
+		its parent node and the goal node.
+		Complexity:
+			Time: O(1)
+			Space: O(1)
+		'''
+		self.g = self.parent.g + euclidian_distance(self.coords, self.parent.coords)
+		self.h = euclidian_distance(self.coords, goal_coord)
+		self.f = self.g + self.h
+		
+	def path_from_start(self) -> List[int]:
+		'''
+		Generates an array of ints representing the current path that this
+		takes from the start point.
+		The returned array of values represents the index ('name') of each node
+		Complexity:
+			Time: O(d) where d is the depth of the node
+			Space: O(d) for each value assigned while traversing from initial node
+		'''
+		path: List[int] = []
+		node = self
+		while node != None:
+			path.append(node.point)
+			if node.parent != None:
+				node = node.parent
+			else:
+				node = None
+		path.reverse()
+		return path
+
+	def __eq__(self, __o: object) -> bool:
+		if isinstance(__o, PathNode):
+			return self.point == __o.point
+		else:
+			return False
+
+	def __str__(self) -> str:
+		return f'{self.point}: {self.path_from_start()}'
+
 
 def get_node_with_least_f(path_nodes: List[PathNode]):
+	'''
+	From the given list, the node with the lowest f value is returned
+	Complexity:
+		Time: O(n) where n is number of nodes on map (worst case)
+		Space: O(1) 
+	'''
 	least_f = None
 	for i in range(len(path_nodes)):
 		if least_f == None:
 			least_f = path_nodes[i]
 		if path_nodes[i].f < least_f.f:
 			least_f = path_nodes[i]
+	path_nodes.remove(least_f)
 	return least_f
 
-def node_list_has_node(node_list: List[PathNode], node: PathNode):
-	for i in node_list:
-		if i.point == node.point:
-			return True
-	return False
 
-def is_in_open_list_points(open_list: List[PathNode], node: PathNode) -> bool:
-	for n in open_list:
-		for i in n.roads:
-			if i == node.point:
-				return True
-	return False 
+def shortest_path(m: any, start: int, goal: int) -> List[int]:
+	'''
+	Calculates shortest path from start point to end point, in the given map 'm'
 
-def path_from_start(node: PathNode):
-	path: List[int] = []
-	while node != None:
-		path.append(node.point)
-		if node.parent != None:
-			node = node.parent
-		else:
-			node = None
-	path.reverse()
-	return path
+	Complexity:
 
-def shortest_path_new(m: Map, start: int, goal: int) -> List[int]:
-	open_list: List[PathNode] = []
-	closed_list: List[PathNode] = []
+		Complexity depends highly on the arrangement of the given map, i.e. number
+		of roads and intersections and how they are laid out.
 
+		Generally, some research tells me the following:
+		
+		Time: O(b^d) 
+			where b is the 'branching factor' - the average number of roads from each point,
+			and d is the depth of the resulting path.
+		
+		Space: O(d)  - The algorithm only stores useful path node data
+
+		Worst case：
+			Time: O(n^n) for map with all nodes interconnected
+			Space: O(n) as all nodes will be stored in the 'visited' set of nodes
+	'''
+	visited: List[PathNode] = []
+	frontier_set: List[PathNode] = []
 	start_node = PathNode(start, m)
 	goal_node = PathNode(goal, m)
-	open_list.append(start_node)
-	while open_list:
-		current_node = get_node_with_least_f(open_list)
-		print(path_from_start(current_node))
-		
-		if current_node == None:
-			return None # path does not exist
-		open_list.remove(current_node)
-		closed_list.append(current_node)
-		
+
+	frontier_set.append(start_node)
+	while len(frontier_set) > 0:
+		# We want node with least total cost
+		current_node = get_node_with_least_f(frontier_set)
+
 		if current_node == goal_node:
-			# End reached
-			# Generate path by traversing parent nodes back to start
-			return path_from_start(current_node) 
+			# Finished
+			return current_node.path_from_start()
 
-		for r in [PathNode(n, m) for n in current_node.roads]:
-			r.g = current_node.g + pythag_distance(current_node.coords, r.coords)
-			r.h = pythag_distance(r.coords, goal_node.coords)
-			r.f = r.g + r.h
-			test_dist = r.f + current_node.h #pythag_distance(current_node.coords, r.coords) + pythag_distance(current_node.coords, goal_node.coords)
-			if r not in open_list and r not in closed_list:
-				r.parent = current_node
-				current_node.child = r
-				open_list.append(r)
-			elif r in closed_list:
-				if r.f > current_node.f + pythag_distance(current_node.coords, r.coords):
-					if r in closed_list:
-						closed_list.remove(r)
-					if r not in open_list:
-						open_list.append(r)
-				else:
-					r.parent = current_node
-					current_node.child = r
-				
+		if current_node not in visited:
+			visited.append(current_node)
 
-		if current_node in open_list:
-			open_list.remove(current_node)
-		if current_node not in closed_list:
-			closed_list.append(current_node)	
-	
-	return None
+			for r in current_node.roads:
+				r_node = PathNode(r, m)
+				r_node.parent = current_node
+				r_node.calculate_g_h_f(goal_node.coords)
+				# Add each road to frontier set 
+				# then on next loop of frontier_set we will check the least cost path first
+				frontier_set.append(r_node)
 
-result = shortest_path_new(map_test, 8, 24)
+result = shortest_path(map_test, 8, 24)
 expected = [8, 14, 16, 37, 12, 17, 10, 24]
 print('DONE')
 print('result: ' + str(result))
